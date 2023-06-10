@@ -9,12 +9,9 @@ import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import org.vismutFO.klavogonki.protocol.PlayerState;
 
-import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -40,6 +37,8 @@ public class Main extends Application {
     @Override
     public void start(Stage stage) {
 
+        timeBeginGame = null;
+
         stateForSending = new PlayerState(-2);
         stateForSending.type = PlayerState.CLIENT_UPDATE;
         inGame = false;
@@ -59,8 +58,10 @@ public class Main extends Application {
 
     void callFromHandler() {
         System.out.println("Listener!");
-        timerToEnd.setText(Duration.between(Instant.now(),
-                timeBeginGame.plusSeconds(185)).toSeconds() + "s");
+        if (timeBeginGame != null) {
+            timerToEnd.setText(Duration.between(Instant.now(),
+                    timeBeginGame.plusSeconds(179)).toSeconds() + "s");
+        }
         while (true) {
             ArrayList<PlayerState> clientEvents = eventsToClient.poll();
             if (clientEvents == null) {
@@ -75,19 +76,20 @@ public class Main extends Application {
                 switch (state.type) {
                     case PlayerState.SERVER_UPDATE -> {
                         playerStates = clientEvents;
-                        updatePlayersTable();
+                        updateUI();
                     }
                     case PlayerState.SERVER_BEGIN_GAME -> {
                         textForTyping.setText(state.playerName);
                         // TODO Lock TextArea
                     }
                     case PlayerState.SERVER_START_TEAM -> {
+                        timeBeginGame = Instant.now();
                         // TODO Unlock TextArea
                     }
                     case PlayerState.SERVER_END_GAME -> {
                         System.out.println("Client End Game!");
                         playerStates = clientEvents;
-                        updatePlayersTable();
+                        updateUI();
                         inGame = false;
                         executeIt.shutdown();
                         textForTyping.setText("END.");
@@ -101,7 +103,7 @@ public class Main extends Application {
         }
     }
 
-    private void updatePlayersTable() {
+    private void updateUI() {
         // sort playersStates
         playerStates.sort((o1, o2) -> {
             if (o1.symbols != o2.symbols) {
@@ -118,9 +120,9 @@ public class Main extends Application {
             if (state.isDisconnected) {
                 newTable += "(Disconnected) ";
             }
-            newTable += (int)(state.symbols * 100 / textForTyping.getText().length()) + ", ";
+            newTable += (int)(state.symbols * 100 / textForTyping.getText().length()) + "%, ";
             newTable += state.errors + " error(s), ";
-            if (Duration.between(timeBeginGame, Instant.now()).toSeconds() == 0) {
+            if (timeBeginGame == null || Duration.between(timeBeginGame, Instant.now()).toSeconds() == 0) {
                 newTable += "0";
             }
             else {
@@ -165,7 +167,6 @@ public class Main extends Application {
                 return;
             }
             inGame = true;
-            timeBeginGame = Instant.now();
             ClientHandler fileClient;
             try {
                 String hostString = host.getText();
@@ -206,7 +207,7 @@ public class Main extends Application {
         GridPane.setConstraints(playersTable, 0, 0);
         grid.getChildren().add(playersTable);
 
-        timerToEnd = new Text("185s");
+        timerToEnd = new Text("timer");
         GridPane.setConstraints(timerToEnd, 1, 0);
         grid.getChildren().add(timerToEnd);
 
