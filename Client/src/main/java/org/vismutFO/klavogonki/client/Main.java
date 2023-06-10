@@ -18,7 +18,7 @@ import java.util.concurrent.Executors;
 
 public class Main extends Application {
 
-    private final ExecutorService executeIt = Executors.newFixedThreadPool(2);
+    private ExecutorService executeIt = Executors.newFixedThreadPool(1);
     private boolean inGame;
 
     private ConcurrentLinkedQueue<ArrayList<PlayerState>> eventsToClient;
@@ -30,8 +30,12 @@ public class Main extends Application {
 
     private Text textForTyping, timerToEnd, playersTable, errorMessage;
 
+    private TextArea panel;
+
     private Instant timeBeginGame;
     private PlayerState stateForSending;
+
+    private Button restart;
 
 
     @Override
@@ -49,19 +53,14 @@ public class Main extends Application {
         stage.setTitle("Klavogonki");
 
         initStartScene(stage);
-        //System.out.println("init3");
         initGameScene(stage);
-        //System.out.println("init4");
         stage.setScene(startScene);
         stage.show();
     }
 
     void callFromHandler() {
         System.out.println("Listener!");
-        if (timeBeginGame != null) {
-            timerToEnd.setText(Duration.between(Instant.now(),
-                    timeBeginGame.plusSeconds(179)).toSeconds() + "s");
-        }
+
         while (true) {
             ArrayList<PlayerState> clientEvents = eventsToClient.poll();
             if (clientEvents == null) {
@@ -80,20 +79,27 @@ public class Main extends Application {
                     }
                     case PlayerState.SERVER_BEGIN_GAME -> {
                         textForTyping.setText(state.playerName);
-                        // TODO Lock TextArea
+                        panel.setDisable(false);
                     }
                     case PlayerState.SERVER_START_TEAM -> {
                         timeBeginGame = Instant.now();
-                        // TODO Unlock TextArea
                     }
                     case PlayerState.SERVER_END_GAME -> {
                         System.out.println("Client End Game!");
+
+                        if (state.status == 1) {
+                            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                            alert.setContentText("Congratulations! You won!");
+                            alert.show();
+                        }
+
+                        panel.setDisable(true);
+                        restart.setDisable(false);
                         playerStates = clientEvents;
                         updateUI();
                         inGame = false;
                         executeIt.shutdown();
                         textForTyping.setText("END.");
-                        // TODO FinalScene
                     }
                     default -> {
                         throw new RuntimeException("PlayerState wrong type " + state.type);
@@ -104,13 +110,15 @@ public class Main extends Application {
     }
 
     private void updateUI() {
-        // sort playersStates
         playerStates.sort((o1, o2) -> {
             if (o1.symbols != o2.symbols) {
                 return (o1.symbols - o2.symbols) * -1;
             }
             return o1.errors - o2.errors;
         });
+        int secondsUntil = playerStates.get(0).secondsUntil;
+        timerToEnd.setText(secondsUntil + "s");
+
         String newTable = "";
         for (PlayerState state : playerStates) {
             newTable += state.playerName + " ";
@@ -120,7 +128,7 @@ public class Main extends Application {
             if (state.status == 2) {
                 newTable += "(Disconnected) ";
             }
-            newTable += (int)(state.symbols * 100 / textForTyping.getText().length()) + "%, ";
+            newTable += (state.symbols * 100 / textForTyping.getText().length()) + "%, ";
             newTable += state.errors + " error(s), ";
             if (timeBeginGame == null || Duration.between(timeBeginGame, Instant.now()).toSeconds() == 0) {
                 newTable += "0";
@@ -138,8 +146,6 @@ public class Main extends Application {
         grid.setPadding(new Insets(10, 10, 10, 10));
         grid.setVgap(5);
         grid.setHgap(5);
-
-        //Alert alert = new Alert(Alert.AlertType.NONE);
 
         TextField host = new TextField();
         host.setPromptText("localhost");
@@ -203,6 +209,15 @@ public class Main extends Application {
         });
         grid.getChildren().add(submit);
 
+        Button aboutGame = new Button("About Game");
+        GridPane.setConstraints(aboutGame, 0, 5);
+        aboutGame.setOnAction(e -> {
+            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+            alert.setContentText("Author: Stepanov Artemiy, BPI211");
+            alert.show();
+        });
+        grid.getChildren().add(aboutGame);
+
         startScene = new Scene(grid, 1080, 720);
     }
 
@@ -216,7 +231,7 @@ public class Main extends Application {
         GridPane.setConstraints(playersTable, 0, 0);
         grid.getChildren().add(playersTable);
 
-        timerToEnd = new Text("timer");
+        timerToEnd = new Text("Timer");
         GridPane.setConstraints(timerToEnd, 1, 0);
         grid.getChildren().add(timerToEnd);
 
@@ -226,20 +241,24 @@ public class Main extends Application {
 
 
 
-        TextArea panel = new TextArea();
+        panel = new TextArea();
+        panel.setDisable(true);
         panel.setPromptText("type here");
         panel.setPrefColumnCount(500);
         panel.textProperty().addListener((observable, oldValue, newValue) -> {
-            stateForSending.symbols = newValue.length();
+            stateForSending.symbols = 0;
             stateForSending.errors = 0;
-            for (int i = 0; i < newValue.length(); i++) {
-                if (i >= textForTyping.getText().length()) {
-                    stateForSending.errors += (newValue.length() - i);
+            boolean haveError = false;
+            for (int i = 0; i < newValue.length() && i < textForTyping.getText().length(); i++) {
+                if (newValue.charAt(i) != textForTyping.getText().charAt(i)) {
+                    stateForSending.symbols = i;
+                    stateForSending.errors = newValue.length() - i - 1;
+                    haveError = true;
                     break;
                 }
-                if (newValue.charAt(i) != textForTyping.getText().charAt(i)) {
-                    stateForSending.errors++;
-                }
+            }
+            if (!haveError) {
+                stateForSending.symbols = Integer.min(newValue.length(), textForTyping.getText().length());
             }
             if (stateForSending.errors > 0) {
                 errorMessage.setText("You have error(s), fix it");
@@ -257,8 +276,27 @@ public class Main extends Application {
         GridPane.setConstraints(panel, 0, 2);
         grid.getChildren().add(panel);
 
+        restart = new Button("New Game");
+        GridPane.setConstraints(restart, 0, 3);
+        restart.setOnAction(e -> {
+            eventsToClient.clear();
+            eventsFromClient.clear();
+            playerStates.clear();
+            timeBeginGame = null;
+            timerToEnd.setText("Timer");
+            playersTable.setText("");
+            textForTyping.setText("Здесь будет текст");
+            panel.setDisable(true);
+            panel.setText("");
+            executeIt = Executors.newFixedThreadPool(1);
+
+            stage.setScene(startScene);
+        });
+        restart.setDisable(true);
+        grid.getChildren().add(restart);
+
         errorMessage = new Text();
-        GridPane.setConstraints(errorMessage, 0, 3);
+        GridPane.setConstraints(errorMessage, 1, 3);
         grid.getChildren().add(errorMessage);
 
         gameScene = new Scene(grid, 1080, 720);
@@ -266,7 +304,7 @@ public class Main extends Application {
 
     @Override
     public void stop() throws Exception {
-        super.stop(); //To change body of generated methods, choose Tools | Templates.
+        super.stop();
         executeIt.shutdown();
         System.exit(0);
     }

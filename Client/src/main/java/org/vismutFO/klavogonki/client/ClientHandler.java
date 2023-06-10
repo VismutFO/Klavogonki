@@ -1,15 +1,12 @@
 package org.vismutFO.klavogonki.client;
 
 import javafx.application.Platform;
-import javafx.event.ActionEvent;
-import javafx.scene.control.Button;
 import org.vismutFO.klavogonki.protocol.PlayerState;
 
 import java.io.*;
 import java.net.Socket;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -37,12 +34,6 @@ public class ClientHandler implements Runnable {
         stateForSending = new PlayerState(-2);
         stateForSending.type = PlayerState.CLIENT_UPDATE;
         stateForSending.playerName = playerName;
-    }
-
-    private void printJSON(String source) {
-        System.out.println("-----------------------");
-        System.out.println(source);
-        System.out.println("-----------------------");
     }
 
     @Override
@@ -73,9 +64,6 @@ public class ClientHandler implements Runnable {
                     System.out.println("SocketException from server1");
                     throw new RuntimeException(e);
                 }
-                printJSON(event.toString());
-                //out.writeUTF(source);
-                //out.flush();
 
                 System.out.println("Server reading from channel");
                 ArrayList<PlayerState> entry;
@@ -96,8 +84,6 @@ public class ClientHandler implements Runnable {
                     System.out.println("Server disconnected");
                     break;
                 }
-                printJSON(PlayerState.getSource(entry));
-                //ArrayList<PlayerState> list = PlayerState.getStates(entry);
                 if (entry.isEmpty()) {
                     throw new RuntimeException("Server response is empty!");
                 }
@@ -114,43 +100,6 @@ public class ClientHandler implements Runnable {
                     break;
                 }
                 Thread.sleep(500);
-                /*
-                ArrayList<PlayerState> result = PlayerState.getStates(entry);
-                if (result.size() != 1) {
-                    System.out.println("Server response wrong size?");
-                }
-                else {
-                    switch (result.get(0).type) {
-                        case PlayerState.SERVER_START_TEAM -> {
-                            System.out.println("New Team!");
-                            System.out.println("Text: " + result.get(0).playerName);
-                        }
-                        case PlayerState.SERVER_BEGIN_GAME -> {
-                            System.out.println("New Game!");
-                            gameStarted = true;
-                        }
-                        case PlayerState.SERVER_END_GAME -> {
-                            System.out.println("End Game.");
-                            endGame = true;
-                        }
-                        case PlayerState.SERVER_UPDATE -> {
-                            System.out.println("Game update");
-                        }
-                        default -> {
-                            System.out.println("Something wrong!");
-                        }
-                    }
-                }
-                if (endGame) {
-                    break;
-                }
-
-                if (gameStarted) {
-                    Thread.sleep(900);
-                    stateForSending.symbols++;
-                    stateForSending.errors++;
-                }
-                */
             }
             in.close();
             out.close();

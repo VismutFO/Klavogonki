@@ -5,7 +5,6 @@ import org.vismutFO.klavogonki.protocol.PlayerState;
 import java.net.Socket;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -19,7 +18,7 @@ public class Team {
     boolean isReady;
     boolean isStarted;
 
-    Instant beginConnect, lastUpdate;
+    Instant beginConnect, beginGonki, lastUpdate;
 
     int textSize;
 

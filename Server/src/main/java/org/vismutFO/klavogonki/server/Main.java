@@ -6,11 +6,9 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.Socket;
+import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -28,6 +26,8 @@ public class Main {
     static private ConcurrentLinkedQueue<Socket> newClients;
 
     static private Set<Integer> bannedSockets;
+
+    static private ArrayList<Resource> textsForGame;
 
     private static  int findSocketIndexByPlayerId(Team team, int id) {
         for (int j = 0; j < team.sockets.size(); j++) {
@@ -70,6 +70,13 @@ public class Main {
 
         teams = new ArrayList<>();
         eventsToServer = new ConcurrentLinkedQueue<>();
+
+        textsForGame = new ArrayList<>();
+        textsForGame.add(new Resource("first.txt"));
+        textsForGame.add(new Resource("second.txt"));
+        textsForGame.add(new Resource("third.txt"));
+        textsForGame.add(new Resource("fourth.txt"));
+        textsForGame.add(new Resource("fifth.txt"));
 
         try (BufferedReader br = new BufferedReader(new InputStreamReader(System.in))) {
             System.out.println("Server socket created, command console reader for listen to server commands");
@@ -121,8 +128,10 @@ public class Main {
                         System.out.println("-----------------------");
                         System.out.println("new team is ready");
                         System.out.println("-----------------------");
+                        team.beginGonki = Instant.now();
                         PlayerState temp = new PlayerState(-1);
                         temp.type = PlayerState.SERVER_START_TEAM;
+                        temp.secondsUntil = 4;
                         team.send(new ArrayList<>(List.of(temp)));
                         team.isReady = true;
                     }
@@ -138,10 +147,14 @@ public class Main {
                                 System.out.println("-----------------------");
                                 PlayerState temp = new PlayerState(-1);
                                 temp.type = PlayerState.SERVER_BEGIN_GAME;
-                                temp.playerName = "Text for typing.";
+                                temp.playerName = textsForGame.get((new Random().nextInt() % 5 + 5) % 5).getContent();
+                                temp.secondsUntil = 179;
                                 team.send(new ArrayList<>(List.of(temp)));
                                 team.isStarted = true;
                                 team.textSize = temp.playerName.length();
+                                for (PlayerState q : team.playerStates) {
+                                    q.secondsUntil = 179;
+                                }
                                 team.send(team.playerStates);
                                 team.lastUpdate = Instant.now();
                             }
@@ -152,6 +165,7 @@ public class Main {
                             System.out.println("-----------------------");
                             for (PlayerState state : team.playerStates) {
                                 state.type = PlayerState.SERVER_END_GAME;
+                                state.secondsUntil = 0;
                             }
                             team.send(team.playerStates);
                             for (PlayerThread s : team.sockets) {
@@ -165,6 +179,24 @@ public class Main {
                     }
                     if (Instant.now().minusMillis(850).isAfter(team.lastUpdate)) {
                         System.out.println("send update");
+                        if (!team.isReady) {
+                            for (PlayerState q : team.playerStates) {
+                                q.secondsUntil = (int)Duration.between(Instant.now(),
+                                        team.beginConnect.plusSeconds(30)).toSeconds();
+                            }
+                        }
+                        else if (!team.isStarted) {
+                            for (PlayerState q : team.playerStates) {
+                                q.secondsUntil = (int)Duration.between(Instant.now(),
+                                        team.beginGonki.plusSeconds(5)).toSeconds();
+                            }
+                        }
+                        else {
+                            for (PlayerState q : team.playerStates) {
+                                q.secondsUntil = (int)Duration.between(Instant.now(),
+                                        team.beginGonki.plusSeconds(185)).toSeconds();
+                            }
+                        }
                         team.send(team.playerStates);
                         team.lastUpdate = Instant.now();
                         // send always
