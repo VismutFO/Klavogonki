@@ -5,10 +5,9 @@ import javafx.event.ActionEvent;
 import javafx.scene.control.Button;
 import org.vismutFO.klavogonki.protocol.PlayerState;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.net.Socket;
+import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -59,31 +58,59 @@ public class ClientHandler implements Runnable {
                     stateForSending = eventsFromClient.poll();
                 }
 
-                String source = PlayerState.getSource(new ArrayList<>(List.of(stateForSending)));
-                printJSON(source);
-                out.writeUTF(source);
-                out.flush();
+                ArrayList<PlayerState> event = new ArrayList<>(List.of(stateForSending));
+                try (ByteArrayOutputStream byteOut = new ByteArrayOutputStream();
+                     ObjectOutputStream objectOut = new ObjectOutputStream(byteOut)) {
+                    objectOut.writeObject(event);
+                    objectOut.flush();
+                    objectOut.close();
+
+                    out.writeInt(byteOut.toByteArray().length);
+                    out.write(byteOut.toByteArray());
+                    out.flush();
+                }
+                catch (SocketException e) {
+                    System.out.println("SocketException from server1");
+                    throw new RuntimeException(e);
+                }
+                printJSON(event.toString());
+                //out.writeUTF(source);
+                //out.flush();
 
                 System.out.println("Server reading from channel");
-                String entry;
+                ArrayList<PlayerState> entry;
                 try {
-                    entry = in.readUTF();
+                    int length = in.readInt();
+                    try (ByteArrayInputStream byteIn = new ByteArrayInputStream(in.readNBytes(length));
+                         ObjectInputStream objectIn = new ObjectInputStream(byteIn)) {
+                        entry = (ArrayList<PlayerState>) objectIn.readObject();
+                    } catch (ClassNotFoundException e) {
+                        throw new RuntimeException(e);
+                    }
+                    catch (SocketException e) {
+                        System.out.println("SocketException from server2");
+                        break;
+                    }
                 }
                 catch (SocketTimeoutException e) {
                     System.out.println("Server disconnected");
                     break;
                 }
-                printJSON(entry);
-                ArrayList<PlayerState> list = PlayerState.getStates(entry);
-                if (list.isEmpty()) {
+                printJSON(PlayerState.getSource(entry));
+                //ArrayList<PlayerState> list = PlayerState.getStates(entry);
+                if (entry.isEmpty()) {
                     throw new RuntimeException("Server response is empty!");
                 }
-                if (!eventsToClient.offer(list)) {
+                ArrayList<PlayerState> entryCopy = new ArrayList<>(entry.size());
+                for (PlayerState temp : entry) {
+                    entryCopy.add(new PlayerState(temp));
+                }
+                if (!eventsToClient.offer(entryCopy)) {
                     throw new RuntimeException("Can't place server response to queue");
                 }
                 Platform.runLater(parent::callFromHandler);
                 System.out.println("Sent update to client");
-                if (list.get(0).type == PlayerState.SERVER_END_GAME) {
+                if (entry.get(0).type == PlayerState.SERVER_END_GAME) {
                     break;
                 }
                 Thread.sleep(500);

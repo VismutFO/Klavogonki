@@ -5,13 +5,14 @@ import org.vismutFO.klavogonki.protocol.PlayerState;
 import java.net.Socket;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class Team {
     final ArrayList<PlayerThread> sockets;
-    private final ArrayList<ConcurrentLinkedQueue<String>> eventsToClients;
+    private final ArrayList<ConcurrentLinkedQueue<ArrayList<PlayerState>>> eventsToClients;
     private final ExecutorService executeIt;
 
     final ArrayList<PlayerState> playerStates;
@@ -50,7 +51,7 @@ public class Team {
 
     boolean isNotAlive() {
         for (PlayerState player : playerStates) {
-            if (!player.isDisconnected) {
+            if (player.status != 2) {
                 return false;
             }
         }
@@ -58,7 +59,7 @@ public class Team {
     }
 
     void addPlayer(Socket playerSocket, ConcurrentLinkedQueue<ServerEvent> eventsToServer, int id) {
-        ConcurrentLinkedQueue<String> eventsToClients = new ConcurrentLinkedQueue<>();
+        ConcurrentLinkedQueue<ArrayList<PlayerState>> eventsToClients = new ConcurrentLinkedQueue<>();
         this.eventsToClients.add(eventsToClients);
         PlayerThread playerThread = new PlayerThread(playerSocket, eventsToClients, eventsToServer, id);
         sockets.add(playerThread);
@@ -78,8 +79,8 @@ public class Team {
 
     void dropDisconnectedPlayers() {
         for (int i = 0; i < sockets.size(); i++) {
-            while (i < sockets.size() && playerStates.get(i).isDisconnected) {
-                if (!eventsToClients.get(i).offer("")) {
+            while (i < sockets.size() && playerStates.get(i).status == 2) {
+                if (!eventsToClients.get(i).offer(new ArrayList<>())) {
                     throw new RuntimeException("Can't put end message to client " + sockets.get(i).getPlayerId());
                 }
                 sockets.remove(i);
@@ -92,27 +93,35 @@ public class Team {
     void send(ArrayList<PlayerState> message) {
         assert(sockets.size() == eventsToClients.size());
         for (int i = 0; i < sockets.size(); i++) {
-            if (playerStates.get(i).isDisconnected) {
+            if (playerStates.get(i).status == 2) {
                 continue;
             }
             if (message == null) {
-                if (!eventsToClients.get(i).offer("")) {
+                if (!eventsToClients.get(i).offer(new ArrayList<>())) {
                     throw new RuntimeException("Can't put end message to client " + sockets.get(i).getPlayerId());
                 }
                 continue;
             }
-            for (PlayerState temp : message) {
-                if (temp.playerId == sockets.get(i).getPlayerId()) {
-                    temp.isThisPlayer = true;
+            ArrayList<PlayerState> messageCopy = new ArrayList<>(message.size());
+            for (int j = 0; j < message.size(); j++) {
+                messageCopy.add(new PlayerState(message.get(j)));
+                if (messageCopy.get(j).playerId == sockets.get(i).getPlayerId()) {
+                    messageCopy.get(j).status = 1;
+                    System.out.println("!!!!!!!!!! "
+                            + messageCopy.get(j).playerName + messageCopy.get(j).playerId);
                 }
             }
-            if (!eventsToClients.get(i).offer(PlayerState.getSource(message))) {
+
+            if (!eventsToClients.get(i).offer(messageCopy)) {
                 throw new RuntimeException("Can't put message to client " + sockets.get(i).getPlayerId());
             }
             System.out.println("team putted message");
-            for (PlayerState temp : message) {
-                temp.isThisPlayer = false;
-            }
+            //for (PlayerState temp : message) {
+                //if (temp.status == 1) {
+                    //temp.status = 0;
+                //}
+                //temp.isThisPlayer = false;
+            //}
         }
     }
     void stop() {

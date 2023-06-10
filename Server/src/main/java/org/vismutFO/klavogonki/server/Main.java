@@ -193,7 +193,7 @@ public class Main {
                     System.out.println("new server event");
 
 
-                    ArrayList<PlayerState> clientEvents = PlayerState.getStates(srcForClientEvents.content);
+                    ArrayList<PlayerState> clientEvents = srcForClientEvents.content;
                     if (clientEvents.size() != 1) {
                         throw new RuntimeException("Incorrect size of clientEvents");
                     }
@@ -206,7 +206,7 @@ public class Main {
                     }
                     int j = findSocketIndexByPlayerId(teams.get(i), clientEvent.playerId);
                     if (clientEvent.type == PlayerState.CLIENT_DISCONNECTED) {
-                        teams.get(i).playerStates.get(j).isDisconnected = true;
+                        teams.get(i).playerStates.get(j).status = 2;
                         continue;
                     }
                     if (clientEvent.type != PlayerState.CLIENT_UPDATE) {

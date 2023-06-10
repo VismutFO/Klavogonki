@@ -3,10 +3,13 @@ package org.vismutFO.klavogonki.protocol;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
 import java.util.ArrayList;
 
-public class PlayerState {
+public class PlayerState implements Serializable {
 
     final public static int SERVER_START_TEAM = 0;
     final public static int SERVER_BEGIN_GAME = 1;
@@ -15,14 +18,13 @@ public class PlayerState {
     final public static int CLIENT_UPDATE = 4;
     final public static int CLIENT_DISCONNECTED = 5;
     final public static int DEFAULT = 6;
-    public int type;
 
+    public int type;
     public int playerId;
-    public String playerName;
     public int errors;
     public int symbols;
-    public boolean isThisPlayer;
-    public boolean isDisconnected;
+    public String playerName;
+    public int status; // 0 - default, 1 - thisPlayer, 2 - disconnected
 
     public PlayerState(int playerId) {
         type = DEFAULT;
@@ -30,8 +32,18 @@ public class PlayerState {
         playerName = "";
         errors = 0;
         symbols = 0;
-        isThisPlayer = false;
-        isDisconnected = false;
+        status = 0;
+        //isThisPlayer = false;
+        //isDisconnected = false;
+    }
+
+    public PlayerState(PlayerState other) {
+        type = other.type;
+        playerId = other.playerId;
+        playerName = other.playerName;
+        errors = other.errors;
+        symbols = other.symbols;
+        status = other.status;
     }
 
     public PlayerState (JSONObject source) throws IOException {
@@ -61,15 +73,15 @@ public class PlayerState {
         }
         symbols = source.getInt("symbols");
 
-        if (!source.has("isThisPlayer")) {
-            throw new IOException("state hasn't isThisPlayer");
+        if (!source.has("status")) {
+            throw new IOException("state hasn't status");
         }
-        isThisPlayer = source.getBoolean("isThisPlayer");
+        status = source.getInt("status");
 
-        if (!source.has("isDisconnected")) {
-            throw new IOException("state hasn't isDisconnected");
-        }
-        isDisconnected = source.getBoolean("isDisconnected");
+        //if (!source.has("isDisconnected")) {
+            //throw new IOException("state hasn't isDisconnected");
+        //}
+        //isDisconnected = source.getBoolean("isDisconnected");
     }
 
     public PlayerState (String all) throws IOException {
@@ -84,8 +96,9 @@ public class PlayerState {
         temp.put("playerName", playerName);
         temp.put("errors", errors);
         temp.put("symbols", symbols);
-        temp.put("isThisPlayer", isThisPlayer);
-        temp.put("isDisconnected", isDisconnected);
+        temp.put("status", status);
+        //temp.put("isThisPlayer", isThisPlayer);
+        //temp.put("isDisconnected", isDisconnected);
         return temp;
     }
 

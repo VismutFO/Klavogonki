@@ -28,7 +28,7 @@ public class Main extends Application {
 
     private ArrayList<PlayerState> playerStates; // for table in gameScene
 
-    private Text textForTyping, timerToEnd, playersTable;
+    private Text textForTyping, timerToEnd, playersTable, errorMessage;
 
     private Instant timeBeginGame;
     private PlayerState stateForSending;
@@ -114,10 +114,10 @@ public class Main extends Application {
         String newTable = "";
         for (PlayerState state : playerStates) {
             newTable += state.playerName + " ";
-            if (state.isThisPlayer) {
+            if (state.status == 1) {
                 newTable += "(It is You) ";
             }
-            if (state.isDisconnected) {
+            if (state.status == 2) {
                 newTable += "(Disconnected) ";
             }
             newTable += (int)(state.symbols * 100 / textForTyping.getText().length()) + "%, ";
@@ -141,19 +141,19 @@ public class Main extends Application {
 
         //Alert alert = new Alert(Alert.AlertType.NONE);
 
-        TextField host = new TextField("localhost");
+        TextField host = new TextField();
         host.setPromptText("localhost");
         host.setPrefColumnCount(15);
         GridPane.setConstraints(host, 0, 1);
         grid.getChildren().add(host);
 
-        TextField port = new TextField("5619");
+        TextField port = new TextField();
         port.setPromptText("5619");
         port.setPrefColumnCount(4);
         GridPane.setConstraints(port, 0, 2);
         grid.getChildren().add(port);
 
-        TextField name = new TextField("Billy");
+        TextField name = new TextField();
         name.setPromptText("Billy");
         name.setPrefColumnCount(20);
         GridPane.setConstraints(name, 0, 3);
@@ -170,16 +170,25 @@ public class Main extends Application {
             ClientHandler fileClient;
             try {
                 String hostString = host.getText();
-                if (hostString == null || hostString.isEmpty()) {
+                if (hostString == null) {
                     throw  new RuntimeException("Wrong host");
                 }
+                if (hostString.isEmpty()) {
+                    hostString = "localhost";
+                }
                 String portString = port.getText();
-                if (portString == null || portString.isEmpty()) {
+                if (portString == null) {
                     throw  new RuntimeException("Wrong port");
                 }
+                if (portString.isEmpty()) {
+                    portString = "5619";
+                }
                 String nameString = name.getText();
-                if (nameString == null || nameString.isEmpty()) {
+                if (nameString == null) {
                     throw  new RuntimeException("Wrong name");
+                }
+                if (nameString.isEmpty()) {
+                    nameString = "Billy";
                 }
                 stateForSending.playerName = nameString;
                 fileClient = new ClientHandler(this, hostString, Integer.parseInt(portString),
@@ -203,7 +212,7 @@ public class Main extends Application {
         grid.setVgap(5);
         grid.setHgap(5);
 
-        playersTable = new Text("???");
+        playersTable = new Text("");
         GridPane.setConstraints(playersTable, 0, 0);
         grid.getChildren().add(playersTable);
 
@@ -211,7 +220,7 @@ public class Main extends Application {
         GridPane.setConstraints(timerToEnd, 1, 0);
         grid.getChildren().add(timerToEnd);
 
-        textForTyping = new Text("abcd");
+        textForTyping = new Text("Здесь будет текст");
         GridPane.setConstraints(textForTyping, 0, 1);
         grid.getChildren().add(textForTyping);
 
@@ -232,13 +241,25 @@ public class Main extends Application {
                     stateForSending.errors++;
                 }
             }
-            if (!eventsFromClient.offer(stateForSending)) {
+            if (stateForSending.errors > 0) {
+                errorMessage.setText("You have error(s), fix it");
+            }
+            else {
+                errorMessage.setText("");
+            }
+            PlayerState stateForSendingCopy = new PlayerState(stateForSending);
+
+            if (!eventsFromClient.offer(stateForSendingCopy)) {
                 throw new RuntimeException("Can't place client state to queue");
             }
             System.out.println("textfield changed from " + oldValue + " to " + newValue);
         });
         GridPane.setConstraints(panel, 0, 2);
         grid.getChildren().add(panel);
+
+        errorMessage = new Text();
+        GridPane.setConstraints(errorMessage, 0, 3);
+        grid.getChildren().add(errorMessage);
 
         gameScene = new Scene(grid, 1080, 720);
     }
