@@ -76,6 +76,19 @@ public class Team {
         return sockets.size();
     }
 
+    void dropDisconnectedPlayers() {
+        for (int i = 0; i < sockets.size(); i++) {
+            while (i < sockets.size() && playerStates.get(i).isDisconnected) {
+                if (!eventsToClients.get(i).offer("")) {
+                    throw new RuntimeException("Can't put end message to client " + sockets.get(i).getPlayerId());
+                }
+                sockets.remove(i);
+                playerStates.remove(i);
+                eventsToClients.remove(i);
+            }
+        }
+    }
+
     void send(ArrayList<PlayerState> message) {
         assert(sockets.size() == eventsToClients.size());
         for (int i = 0; i < sockets.size(); i++) {

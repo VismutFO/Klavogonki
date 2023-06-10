@@ -126,6 +126,10 @@ public class Main {
                         team.send(new ArrayList<>(List.of(temp)));
                         team.isReady = true;
                     }
+                    if (!team.isReady) {
+                        //System.out.println("----Drop disconnected players!-----");
+                        team.dropDisconnectedPlayers();
+                    }
                     if (team.isReady) {
                         if (!team.isStarted) {
                             if (Instant.now().minusSeconds(5).isAfter(team.beginConnect)) {
